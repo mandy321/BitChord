@@ -24,6 +24,9 @@ class BitChordConnectSpeaker(
     private var lastRequestedSeekMs: Long? = null
     private var lastRequestedSeekAt: Long = 0L
 
+    private var optimisticIsPlaying: Boolean? = null
+    private var optimisticAt: Long = 0L
+
     private var syncingFromRemote = false
 
     fun setActive(isActive: Boolean) {
@@ -31,6 +34,7 @@ class BitChordConnectSpeaker(
         active = isActive
         if (!isActive) {
             syncingFromRemote = false
+            optimisticIsPlaying = null
         }
         sink?.onRemoteRouteChanged()
         onSpeakerStateChanged()
@@ -38,6 +42,9 @@ class BitChordConnectSpeaker(
 
     fun onSnapshotReceived(snapshot: ConnectPlaybackSnapshot) {
         if (!active) return
+        if (optimisticIsPlaying != null && SystemClock.elapsedRealtime() - optimisticAt > 800) {
+            optimisticIsPlaying = null
+        }
         val remoteSong = snapshot.song
         if (remoteSong != null) {
             syncRemoteSnapshot(snapshot)
@@ -83,13 +90,34 @@ class BitChordConnectSpeaker(
     }
 
     override val playWhenReady: Boolean
-        get() = if (active) client.remoteState.value?.playWhenReady ?: false else false
+        get() {
+            if (!active) return false
+            val opt = optimisticIsPlaying
+            if (opt != null && SystemClock.elapsedRealtime() - optimisticAt < 1200) {
+                return opt
+            }
+            return client.remoteState.value?.playWhenReady ?: false
+        }
 
     override val isPlaying: Boolean
-        get() = if (active) client.remoteState.value?.isPlaying ?: false else false
+        get() {
+            if (!active) return false
+            val opt = optimisticIsPlaying
+            if (opt != null && SystemClock.elapsedRealtime() - optimisticAt < 1200) {
+                return opt
+            }
+            return client.remoteState.value?.isPlaying ?: false
+        }
 
     override val playbackState: Int
-        get() = if (active) client.remoteState.value?.playbackState ?: Player.STATE_IDLE else Player.STATE_IDLE
+        get() {
+            if (!active) return Player.STATE_IDLE
+            val opt = optimisticIsPlaying
+            if (opt != null && SystemClock.elapsedRealtime() - optimisticAt < 1200) {
+                return Player.STATE_READY
+            }
+            return client.remoteState.value?.playbackState ?: Player.STATE_IDLE
+        }
 
     override val positionMs: Long
         get() {
@@ -113,11 +141,19 @@ class BitChordConnectSpeaker(
 
     override fun play() {
         if (!active) return
-        client.sendCommand(ConnectCommand(action = ConnectCommand.ACTION_RESUME))
+        optimisticIsPlaying = true
+        optimisticAt = SystemClock.elapsedRealtime()
+        sink?.onRemotePlaybackChanged()
+        onSpeakerStateChanged()
+        client.sendCommand(ConnectCommand(action = ConnectCommand.ACTION_PLAY))
     }
 
     override fun pause() {
         if (!active) return
+        optimisticIsPlaying = false
+        optimisticAt = SystemClock.elapsedRealtime()
+        sink?.onRemotePlaybackChanged()
+        onSpeakerStateChanged()
         client.sendCommand(ConnectCommand(action = ConnectCommand.ACTION_PAUSE))
     }
 
@@ -131,11 +167,35 @@ class BitChordConnectSpeaker(
     override fun seekToNext() {
         if (!active) return
         client.sendCommand(ConnectCommand(action = ConnectCommand.ACTION_SKIP_NEXT))
+        val player = localPlayer()
+        if (player != null && player.hasNextMediaItem()) {
+            syncingFromRemote = true
+            try {
+                player.seekToNextMediaItem()
+                player.pause()
+            } finally {
+                syncingFromRemote = false
+            }
+            sink?.onRemotePlaybackChanged()
+            onSpeakerStateChanged()
+        }
     }
 
     override fun seekToPrevious() {
         if (!active) return
         client.sendCommand(ConnectCommand(action = ConnectCommand.ACTION_SKIP_PREVIOUS))
+        val player = localPlayer()
+        if (player != null && player.hasPreviousMediaItem()) {
+            syncingFromRemote = true
+            try {
+                player.seekToPreviousMediaItem()
+                player.pause()
+            } finally {
+                syncingFromRemote = false
+            }
+            sink?.onRemotePlaybackChanged()
+            onSpeakerStateChanged()
+        }
     }
 
     override fun setVolume(fraction: Float) {

@@ -7509,6 +7509,8 @@ class PlaybackService : MediaLibraryService() {
         private var reportedPlayWhenReady = false
         private var reportedPlaybackState = Player.STATE_IDLE
         private var reportedIsPlaying = false
+        private var reportedMediaId: String? = null
+        private var reportedMediaItemIndex = C.INDEX_UNSET
 
         init {
             cast.sink = this
@@ -7611,6 +7613,21 @@ class PlaybackService : MediaLibraryService() {
             val playWhenReady = getPlayWhenReady()
             val state = getPlaybackState()
             val playing = isPlaying()
+            val currentItem = currentMediaItem
+            val currentMediaId = currentItem?.mediaId
+            val currentIndex = currentMediaItemIndex
+
+            if (currentMediaId != reportedMediaId || currentIndex != reportedMediaItemIndex) {
+                reportedMediaId = currentMediaId
+                reportedMediaItemIndex = currentIndex
+                flags.add(Player.EVENT_MEDIA_ITEM_TRANSITION)
+                flags.add(Player.EVENT_TIMELINE_CHANGED)
+                listeners.forEach {
+                    it.onMediaItemTransition(currentItem, Player.MEDIA_ITEM_TRANSITION_REASON_AUTO)
+                    it.onTimelineChanged(currentTimeline, Player.TIMELINE_CHANGE_REASON_PLAYLIST_CHANGED)
+                }
+            }
+
             if (playWhenReady != reportedPlayWhenReady) {
                 reportedPlayWhenReady = playWhenReady
                 flags.add(Player.EVENT_PLAY_WHEN_READY_CHANGED)

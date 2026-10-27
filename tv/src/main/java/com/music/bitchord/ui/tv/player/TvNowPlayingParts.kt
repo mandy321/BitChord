@@ -87,6 +87,7 @@ import com.music.bitchord.data.model.isYouTubeThumbnailUrl
 import com.music.bitchord.data.settings.TvSettings
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.model.Song
+import com.music.bitchord.data.model.durationMillis
 import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.playback.PlaybackPosition
 import com.music.bitchord.sharedui.resources.Res
@@ -325,6 +326,7 @@ internal fun TvNowPlayingStage(
                             onSeek(adjustedLyricsSeekTarget(lineTimeMs, lyricsOffsetMs))
                         },
                         centerFocus = true,
+                        durationMs = song.durationMillis(),
                         modifier = Modifier.fillMaxSize(),
                     )
                 }

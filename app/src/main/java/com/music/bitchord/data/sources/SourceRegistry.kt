@@ -161,7 +161,15 @@ object SourceRegistry {
         // default is the policy: JioSaavn off, YouTube on.
         val updatedStored = stored.map { s ->
             val match = PREBAKED_SOURCES.firstOrNull { it.id == s.id }
-            if (match != null && match.baseUrl != s.baseUrl) {
+                ?: if (s.baseUrl.contains("eljohnzcaddon.velixir.run") || s.baseUrl.contains("eljohnzc-addon")) {
+                    PREBAKED_SOURCES.firstOrNull { it.id == "eljohnzc.addon.music" }
+                } else if (s.baseUrl.contains("bitchord-hires")) {
+                    PREBAKED_SOURCES.firstOrNull { it.id == "dev.akira.bitchord-hires" }
+                } else if (s.baseUrl.contains("eljohnzc-mono")) {
+                    PREBAKED_SOURCES.firstOrNull { it.id == "eljohnzc.addon.mono" }
+                } else null
+
+            if (match != null && (match.baseUrl != s.baseUrl || match.label != s.label)) {
                 s.copy(baseUrl = match.baseUrl, label = match.label)
             } else {
                 s
@@ -182,7 +190,10 @@ object SourceRegistry {
                 when {
                     config.kind == SourceKind.YOUTUBE && !config.enabled -> config.copy(enabled = true)
                     config.kind == SourceKind.JIOSAAVN && forceJioSaavnOff -> config.copy(enabled = false)
-                    config.id == "app.bitchord.lastbabe" || config.id == "eljohnzc.addon.mono" -> config.copy(enabled = true)
+                    config.id == "app.bitchord.lastbabe" ||
+                    config.id == "eljohnzc.addon.mono" ||
+                    config.id == "dev.akira.bitchord-hires" ||
+                    config.id == "eljohnzc.addon.music" -> config.copy(enabled = true)
                     else -> config
                 }
             }
@@ -554,7 +565,7 @@ object SourceRegistry {
         SourceConfig(
             id = "dev.akira.bitchord-hires",
             kind = SourceKind.ADDON,
-            label = "BitChord Hi-Res (Lossless / Atmos)",
+            label = "BitChord Hi-Res (Hi-Res & Lossless)",
             baseUrl = "https://bitchord-hires-addon.vercel.app/manifest.json",
             enabled = true,
             allowDownloads = true,
@@ -563,8 +574,8 @@ object SourceRegistry {
         SourceConfig(
             id = "eljohnzc.addon.music",
             kind = SourceKind.ADDON,
-            label = "Eljohnzc Addon (Hi-Res / Atmos)",
-            baseUrl = "https://eljohnzcaddon.velixir.run/c57e7b0ef2031b2f1fcd/manifest.json",
+            label = "Eljohnzc Addon (Hi-Res & Lossless, High, Low)",
+            baseUrl = "https://eljohnzc-addon.de.deplexo.com/c57e7b0ef2031b2f1fcd/manifest.json",
             enabled = true,
             allowDownloads = true,
             checkValidLossless = false,

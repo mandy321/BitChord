@@ -218,6 +218,7 @@ fun SettingsScreen(
     val animatedCanvas by AppSettings.animatedCanvas.collectAsStateWithLifecycle()
     val canvasOverCellular by AppSettings.canvasOverCellular.collectAsStateWithLifecycle()
     val prioritizeSpotifyCanvas by AppSettings.prioritizeSpotifyCanvas.collectAsStateWithLifecycle()
+    val hideYoutubeThumbnails by AppSettings.hideYoutubeThumbnails.collectAsStateWithLifecycle()
     val strictLosslessOnly by AppSettings.strictLosslessOnly.collectAsStateWithLifecycle()
     val signatureApiEnabled by AppSettings.signatureApiEnabled.collectAsStateWithLifecycle()
     val signatureApiUrl by AppSettings.signatureApiUrl.collectAsStateWithLifecycle()
@@ -942,6 +943,14 @@ fun SettingsScreen(
                         title = prioritizeSpotifyTitle,
                         checked = prioritizeSpotifyCanvas,
                         onCheckedChange = AppSettings::setPrioritizeSpotifyCanvas,
+                    )
+                }
+                val hideYoutubeTitle = "Hide YouTube Thumbnails"
+                row(hideYoutubeTitle, "youtube", "thumbnails", "artwork", divided = false) {
+                    SettingsSubRow(
+                        title = hideYoutubeTitle,
+                        checked = hideYoutubeThumbnails,
+                        onCheckedChange = AppSettings::setHideYoutubeThumbnails,
                     )
                 }
                 val spotifyCanvasTitle = stringResource(R.string.integrate_spotify_canvas)

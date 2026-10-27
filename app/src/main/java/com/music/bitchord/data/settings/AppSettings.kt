@@ -454,6 +454,8 @@ object AppSettings {
 
     /** Tries Spotify before Apple Music and the other animated-art providers. */
     val prioritizeSpotifyCanvas = MutableStateFlow(false)
+    /** Whether to suppress YouTube video screenshots and prioritize studio covers & canvas. */
+    val hideYoutubeThumbnails = MutableStateFlow(true)
 
     /** Only plays Dolby Atmos or Lossless FLAC/ALAC masters; never falls back to lossy Opus. */
     val strictLosslessOnly = MutableStateFlow(false)
@@ -885,6 +887,7 @@ object AppSettings {
         canvasOverCellular.value = prefs.getBoolean(KEY_CANVAS_OVER_CELLULAR, false)
         spotifyCanvasAutoHide.value = prefs.getBoolean(KEY_SPOTIFY_CANVAS_AUTO_HIDE, true)
         prioritizeSpotifyCanvas.value = prefs.getBoolean(KEY_PRIORITIZE_SPOTIFY_CANVAS, false)
+        hideYoutubeThumbnails.value = prefs.getBoolean(KEY_HIDE_YOUTUBE_THUMBNAILS, true)
         strictLosslessOnly.value = prefs.getBoolean(KEY_STRICT_LOSSLESS_ONLY, false)
         signatureApiEnabled.value = prefs.getBoolean(KEY_SIGNATURE_API_ENABLED, false)
         signatureApiUrl.value = normalizeSignatureApiUrl(prefs.getString(KEY_SIGNATURE_API_URL, "").orEmpty())
@@ -1449,6 +1452,11 @@ object AppSettings {
     fun setPrioritizeSpotifyCanvas(value: Boolean) {
         prioritizeSpotifyCanvas.value = value
         prefs.edit().putBoolean(KEY_PRIORITIZE_SPOTIFY_CANVAS, value).apply()
+    }
+
+    fun setHideYoutubeThumbnails(value: Boolean) {
+        hideYoutubeThumbnails.value = value
+        prefs.edit().putBoolean(KEY_HIDE_YOUTUBE_THUMBNAILS, value).apply()
     }
 
     fun setStrictLosslessOnly(value: Boolean) {
@@ -2048,6 +2056,7 @@ object AppSettings {
     private const val KEY_CANVAS_OVER_CELLULAR = "canvas_over_cellular"
     private const val KEY_SPOTIFY_CANVAS_AUTO_HIDE = "spotify_canvas_auto_hide"
     private const val KEY_PRIORITIZE_SPOTIFY_CANVAS = "prioritize_spotify_canvas"
+    private const val KEY_HIDE_YOUTUBE_THUMBNAILS = "hide_youtube_thumbnails"
     private const val KEY_STRICT_LOSSLESS_ONLY = "strict_lossless_only"
     private const val KEY_SIGNATURE_API_ENABLED = "signature_api_enabled"
     private const val KEY_SIGNATURE_API_URL = "signature_api_url"

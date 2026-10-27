@@ -308,6 +308,14 @@ fun TvSettingsScreen(
             }
             item {
                 TvListRow(
+                    title = "Artwork Priority",
+                    value = if (prioritizeSpotifyCanvas) "Spotify First" else "Apple Music First",
+                    onFocused = { blurb = "Choose whether Apple Music studio artwork or Spotify Canvas takes top display priority." },
+                    onClick = { AppSettings.setPrioritizeSpotifyCanvas(!prioritizeSpotifyCanvas) },
+                )
+            }
+            item {
+                TvListRow(
                     title = "Stats for Nerds",
                     value = onOff(nerdStats),
                     onFocused = { blurb = "Shows the codec, bitrate and sample rate of what's playing." },

@@ -12,7 +12,7 @@ import org.json.JSONObject
 import java.net.URLEncoder
 
 /**
- * Result representing official Apple Music artwork and optional motion canvas for a track.
+ * Result representing official studio artwork and optional motion canvas for a track.
  */
 data class AppleArtwork(
     val artworkUrl: String,
@@ -20,10 +20,12 @@ data class AppleArtwork(
     val title: String? = null,
     val artist: String? = null,
     val album: String? = null,
+    val source: String = "Apple",
 )
 
 /**
- * Resolves official studio album artwork and motion covers from Apple Music.
+ * Resolves official studio album artwork and motion covers from Apple Music,
+ * falling back to Spotify static studio artwork and active addons.
  *
  * Caches results in an LRU memory cache so re-visits on TV or queue lookups
  * resolve synchronously without re-querying the network.
@@ -31,7 +33,7 @@ data class AppleArtwork(
 object AppleArtworkRepository {
 
     private const val TAG = "AppleArtworkRepository"
-    private const val CACHE_SIZE = 128
+    private const val CACHE_SIZE = 256
 
     private class Entry(val artwork: AppleArtwork?)
 
@@ -43,7 +45,7 @@ object AppleArtworkRepository {
     private val lock = Mutex()
 
     /**
-     * Synchronously returns cached Apple artwork if already resolved, or null.
+     * Synchronously returns cached studio artwork if already resolved, or null.
      */
     fun cached(song: Song?): AppleArtwork? {
         if (song == null) return null
@@ -52,7 +54,7 @@ object AppleArtworkRepository {
     }
 
     /**
-     * Resolves Apple Artwork (high-res official album cover and motion video if available).
+     * Resolves Studio Artwork (high-res official album cover and motion video if available).
      * Guaranteed never to throw.
      */
     suspend fun artworkFor(song: Song?): AppleArtwork? {
@@ -91,19 +93,71 @@ object AppleArtworkRepository {
     private fun cacheKey(song: Song): String =
         if (song.videoId.isNotBlank()) "song|${song.videoId}" else "song|${song.title}|${song.artist}"
 
-    private fun resolve(title: String, artist: String, album: String?): AppleArtwork? {
+    private suspend fun resolve(title: String, artist: String, album: String?): AppleArtwork? {
         // 1. Check AppleMusicCanvas to see if an Apple Music motion cover exists
         val motion = runCatching { AppleMusicCanvas.search(title, artist, album) }.getOrNull()
 
-        // 2. Fetch official Apple Music studio album art from iTunes Search API
-        val term = buildString {
+        // 2. Fetch official Apple Music studio album art from iTunes Search API with progressive queries
+        val termsToTry = mutableListOf<String>()
+        val fullTerm = buildString {
             if (!title.contains(artist, ignoreCase = true)) append(artist).append(' ')
             append(title)
             if (!album.isNullOrBlank() && !title.contains(album, ignoreCase = true)) {
                 append(' ').append(album)
             }
         }.trim()
+        termsToTry.add(fullTerm)
 
+        val artistTitleTerm = buildString {
+            if (!title.contains(artist, ignoreCase = true)) append(artist).append(' ')
+            append(title)
+        }.trim()
+        if (artistTitleTerm != fullTerm && artistTitleTerm.isNotBlank()) {
+            termsToTry.add(artistTitleTerm)
+        }
+
+        for (term in termsToTry) {
+            val itunesHit = queryItunes(term, title, artist, album, motion)
+            if (itunesHit != null) {
+                return itunesHit
+            }
+        }
+
+        // 3. Fallback to Spotify studio artwork if Spotify canvas / track hit is available
+        val spotifyHit = runCatching {
+            val canvas = SpotifyCanvas.search(title, artist, album)
+            if (canvas != null) {
+                AppleArtwork(
+                    artworkUrl = "", // Spotify canvas video available
+                    motionCanvas = canvas,
+                    title = canvas.title,
+                    artist = canvas.artist,
+                    album = canvas.album,
+                    source = "Spotify",
+                )
+            } else null
+        }.getOrNull()
+
+        if (spotifyHit != null) {
+            return spotifyHit
+        }
+
+        // 4. If motion exists even if iTunes search had no hit:
+        if (motion != null) {
+            return AppleArtwork(
+                artworkUrl = "",
+                motionCanvas = motion,
+                title = motion.title,
+                artist = motion.artist,
+                album = motion.album,
+                source = "Apple",
+            )
+        }
+
+        return null
+    }
+
+    private fun queryItunes(term: String, title: String, artist: String, album: String?, motion: CanvasArtwork?): AppleArtwork? {
         val url = "https://itunes.apple.com/search?term=${URLEncoder.encode(term, "UTF-8")}&entity=song&limit=5"
         val request = Request.Builder()
             .url(url)
@@ -112,63 +166,49 @@ object AppleArtworkRepository {
 
         val body = runCatching {
             Http.client.newCall(request).execute().use { it.body?.string() }
-        }.getOrNull()
+        }.getOrNull() ?: return null
 
-        if (body != null) {
-            val root = runCatching { JSONObject(body) }.getOrNull()
-            val results = root?.optJSONArray("results")
-            if (results != null) {
-                val wantedTitle = title.normalizeForMatch()
-                val wantedArtists = splitArtists(artist)
-                val wantedAlbum = album?.normalizeForMatch()
+        val root = runCatching { JSONObject(body) }.getOrNull()
+        val results = root?.optJSONArray("results") ?: return null
 
-                for (i in 0 until results.length()) {
-                    val r = results.optJSONObject(i) ?: continue
-                    val trackName = r.optString("trackName").normalizeForMatch()
-                    val collectionName = r.optString("collectionName").normalizeForMatch()
+        val wantedTitle = title.normalizeForMatch()
+        val wantedArtists = splitArtists(artist)
+        val wantedAlbum = album?.normalizeForMatch()
 
-                    // Match validation
-                    val titleOk = trackName.contains(wantedTitle) || wantedTitle.contains(trackName) ||
-                        trackName.replace(" ", "") == wantedTitle.replace(" ", "")
-                    val artistOk = wantedArtists.isEmpty() || wantedArtists.any { want ->
-                        splitArtists(r.optString("artistName")).any { credited ->
-                            credited.contains(want) || want.contains(credited)
-                        }
-                    }
-                    val albumOk = wantedAlbum.isNullOrBlank() || collectionName.isBlank() ||
-                        collectionName.contains(wantedAlbum) || wantedAlbum.contains(collectionName)
+        for (i in 0 until results.length()) {
+            val r = results.optJSONObject(i) ?: continue
+            val trackName = r.optString("trackName").normalizeForMatch()
+            val collectionName = r.optString("collectionName").normalizeForMatch()
 
-                    if (titleOk && artistOk) {
-                        val raw100 = r.optString("artworkUrl100")
-                        if (raw100.isNotBlank()) {
-                            val highRes = raw100
-                                .replace("100x100bb", "1000x1000bb")
-                                .replace("60x60bb", "1000x1000bb")
-                            Log.d(TAG, "resolved Apple artwork for '$title' -> $highRes (motion: ${motion != null})")
-                            return AppleArtwork(
-                                artworkUrl = highRes,
-                                motionCanvas = motion,
-                                title = r.optString("trackName"),
-                                artist = r.optString("artistName"),
-                                album = r.optString("collectionName"),
-                            )
-                        }
-                    }
+            // Match validation
+            val titleOk = trackName.contains(wantedTitle) || wantedTitle.contains(trackName) ||
+                trackName.replace(" ", "") == wantedTitle.replace(" ", "")
+            val artistOk = wantedArtists.isEmpty() || wantedArtists.any { want ->
+                splitArtists(r.optString("artistName")).any { credited ->
+                    credited.contains(want) || want.contains(credited)
+                }
+            }
+            val albumOk = wantedAlbum.isNullOrBlank() || collectionName.isBlank() ||
+                collectionName.contains(wantedAlbum) || wantedAlbum.contains(collectionName)
+
+            if (titleOk && artistOk) {
+                val raw100 = r.optString("artworkUrl100")
+                if (raw100.isNotBlank()) {
+                    val highRes = raw100
+                        .replace("100x100bb", "1000x1000bb")
+                        .replace("60x60bb", "1000x1000bb")
+                    Log.d(TAG, "resolved Apple artwork for '$title' -> $highRes (motion: ${motion != null})")
+                    return AppleArtwork(
+                        artworkUrl = highRes,
+                        motionCanvas = motion,
+                        title = r.optString("trackName"),
+                        artist = r.optString("artistName"),
+                        album = r.optString("collectionName"),
+                        source = "Apple",
+                    )
                 }
             }
         }
-
-        // If motion exists even if iTunes search had no hit:
-        if (motion != null) {
-            return AppleArtwork(
-                artworkUrl = "",
-                motionCanvas = motion,
-                title = motion.title,
-                artist = motion.artist,
-                album = motion.album,
-            )
-        }
-
         return null
     }
 }

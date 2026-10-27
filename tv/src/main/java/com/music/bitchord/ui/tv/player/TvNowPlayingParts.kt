@@ -91,6 +91,7 @@ import com.music.bitchord.data.settings.AppSettings
 import com.music.bitchord.playback.PlaybackPosition
 import com.music.bitchord.sharedui.resources.Res
 import com.music.bitchord.sharedui.resources.ic_dolby_atmos
+import com.music.bitchord.sharedui.resources.ic_lossless
 import com.music.bitchord.sharedui.resources.ic_player_next
 import com.music.bitchord.sharedui.resources.ic_player_pause
 import com.music.bitchord.sharedui.resources.ic_player_play
@@ -99,6 +100,7 @@ import com.music.bitchord.ui.icons.BitChordIcons
 import com.music.bitchord.ui.player.ArtworkMeshBackdrop
 import com.music.bitchord.ui.player.CanvasArtworkPlayer
 import com.music.bitchord.ui.player.SyncedLyricsPanel
+import com.music.bitchord.ui.player.adjustedLyricsSeekTarget
 import com.music.bitchord.ui.player.rememberArtworkMesh
 import com.music.bitchord.ui.tv.components.TvActivityIndicator
 import com.music.bitchord.ui.tv.components.TvArtwork
@@ -170,6 +172,7 @@ internal fun TvNowPlayingStage(
     val canvasEnabled by AppSettings.animatedCanvas.collectAsState()
     val prioritizeSpotifyCanvas by AppSettings.prioritizeSpotifyCanvas.collectAsState()
     val hideYoutubeThumbnails by TvSettings.tvHideYoutubeThumbnails.collectAsState()
+    val lyricsOffsetMs by AppSettings.lyricsOffsetMs.collectAsState()
 
     var appleArt by remember(song.videoId) { mutableStateOf(AppleArtworkRepository.cached(song)) }
     var canvas by remember(song.videoId) { mutableStateOf<CanvasArtwork?>(null) }
@@ -313,7 +316,9 @@ internal fun TvNowPlayingStage(
                         position = position,
                         looking = lyricsLoading,
                         isPlaying = isPlaying,
-                        onSeekToLine = onSeek,
+                        onSeekToLine = { lineTimeMs ->
+                            onSeek(adjustedLyricsSeekTarget(lineTimeMs, lyricsOffsetMs))
+                        },
                         centerFocus = true,
                         modifier = Modifier.fillMaxSize(),
                     )
@@ -690,7 +695,22 @@ private fun TvQualityLine(showStats: Boolean, modifier: Modifier = Modifier) {
         stats.isDolbyAtmos -> "Dolby Atmos"
         stats.isHiRes -> "Hi-Res Lossless"
         stats.isLossless -> "Lossless"
-        else -> null
+        else -> {
+            val codec = when (val mime = stats.mimeType?.lowercase()) {
+                null -> null
+                "audio/flac" -> "FLAC"
+                "audio/alac" -> "ALAC"
+                "audio/mp4a-latm", "audio/aac" -> "AAC"
+                "audio/opus" -> "Opus"
+                "audio/vorbis" -> "Vorbis"
+                "audio/mpeg" -> "MP3"
+                else -> mime.substringAfter('/').uppercase()
+            }
+            val kbps = stats.bitrateKbps
+            if (codec != null && kbps != null && kbps > 0) {
+                "$codec • $kbps kbps"
+            } else codec
+        }
     }
     val detail = if (showStats) streamDetail(stats) else null
     if (label == null && detail.isNullOrBlank()) return
@@ -711,6 +731,13 @@ private fun TvQualityLine(showStats: Boolean, modifier: Modifier = Modifier) {
                 if (stats.isDolbyAtmos) {
                     Icon(
                         painter = painterResource(Res.drawable.ic_dolby_atmos),
+                        contentDescription = null,
+                        tint = TvGlass.TextPrimary.copy(alpha = 0.85f),
+                        modifier = Modifier.height(9.dp),
+                    )
+                } else if (stats.isLossless || stats.isHiRes) {
+                    Icon(
+                        painter = painterResource(Res.drawable.ic_lossless),
                         contentDescription = null,
                         tint = TvGlass.TextPrimary.copy(alpha = 0.85f),
                         modifier = Modifier.height(9.dp),

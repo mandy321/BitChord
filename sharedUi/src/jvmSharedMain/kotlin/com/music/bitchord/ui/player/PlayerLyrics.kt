@@ -543,10 +543,10 @@ internal fun LyricsStatusWithChange(
     }
 }
 
-internal fun adjustedLyricsPosition(positionMs: Long, offsetMs: Int): Long =
+fun adjustedLyricsPosition(positionMs: Long, offsetMs: Int): Long =
     (positionMs - offsetMs.toLong()).coerceAtLeast(0L)
 
-internal fun adjustedLyricsSeekTarget(lineTimeMs: Long, offsetMs: Int): Long =
+fun adjustedLyricsSeekTarget(lineTimeMs: Long, offsetMs: Int): Long =
     (lineTimeMs + offsetMs.toLong()).coerceAtLeast(0L)
 
 /**

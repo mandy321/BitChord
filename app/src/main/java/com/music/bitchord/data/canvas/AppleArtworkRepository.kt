@@ -94,10 +94,13 @@ object AppleArtworkRepository {
         if (song.videoId.isNotBlank()) "song|${song.videoId}" else "song|${song.title}|${song.artist}"
 
     private suspend fun resolve(title: String, artist: String, album: String?): AppleArtwork? {
-        // 1. Check AppleMusicCanvas to see if an Apple Music motion cover exists
-        val motion = runCatching { AppleMusicCanvas.search(title, artist, album) }.getOrNull()
+        // 1. Priority 1 for Motion: Apple Music motion artwork
+        val appleMotion = runCatching { AppleMusicCanvas.search(title, artist, album) }.getOrNull()
 
-        // 2. Fetch official Apple Music studio album art from iTunes Search API with progressive queries
+        // 2. Priority 2 for Motion: Spotify Canvas looping video (if Apple motion not available)
+        val bestMotion = appleMotion ?: runCatching { SpotifyCanvas.search(title, artist, album) }.getOrNull()
+
+        // 3. Fetch official Apple Music studio album art from iTunes Search API with progressive queries
         val termsToTry = mutableListOf<String>()
         val fullTerm = buildString {
             if (!title.contains(artist, ignoreCase = true)) append(artist).append(' ')
@@ -117,40 +120,21 @@ object AppleArtworkRepository {
         }
 
         for (term in termsToTry) {
-            val itunesHit = queryItunes(term, title, artist, album, motion)
+            val itunesHit = queryItunes(term, title, artist, album, bestMotion)
             if (itunesHit != null) {
                 return itunesHit
             }
         }
 
-        // 3. Fallback to Spotify studio artwork if Spotify canvas / track hit is available
-        val spotifyHit = runCatching {
-            val canvas = SpotifyCanvas.search(title, artist, album)
-            if (canvas != null) {
-                AppleArtwork(
-                    artworkUrl = "", // Spotify canvas video available
-                    motionCanvas = canvas,
-                    title = canvas.title,
-                    artist = canvas.artist,
-                    album = canvas.album,
-                    source = "Spotify",
-                )
-            } else null
-        }.getOrNull()
-
-        if (spotifyHit != null) {
-            return spotifyHit
-        }
-
-        // 4. If motion exists even if iTunes search had no hit:
-        if (motion != null) {
+        // 4. If motion exists even if iTunes search had no static artwork hit:
+        if (bestMotion != null) {
             return AppleArtwork(
                 artworkUrl = "",
-                motionCanvas = motion,
-                title = motion.title,
-                artist = motion.artist,
-                album = motion.album,
-                source = "Apple",
+                motionCanvas = bestMotion,
+                title = bestMotion.title,
+                artist = bestMotion.artist,
+                album = bestMotion.album,
+                source = if (bestMotion.source == CanvasSource.SPOTIFY) "Spotify" else "Apple",
             )
         }
 

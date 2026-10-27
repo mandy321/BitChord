@@ -86,6 +86,7 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.zIndex
 import coil3.compose.AsyncImage
+import com.music.bitchord.data.canvas.AppleArtworkRepository
 import com.music.bitchord.data.model.MoodGenre
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.model.artworkAt
@@ -791,8 +792,9 @@ fun TvSongRow(
         horizontalArrangement = Arrangement.spacedBy(11.dp),
     ) {
         if (showArtwork) {
+            val cachedArt = AppleArtworkRepository.cached(song)?.artworkUrl
             TvArtwork(
-                url = song.thumbnailUrl,
+                url = cachedArt ?: song.thumbnailUrl,
                 px = 160,
                 shape = RoundedCornerShape(5.dp),
                 modifier = Modifier.size(34.dp),

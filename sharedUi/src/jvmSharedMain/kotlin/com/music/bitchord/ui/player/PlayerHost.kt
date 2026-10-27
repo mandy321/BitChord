@@ -382,7 +382,7 @@ internal fun rememberOutputPicker(onOpen: () -> Unit): () -> Unit =
     PlayerPlatform.host.rememberOutputPicker(onOpen)
 
 @Composable
-internal fun rememberRemoteArtworkUrl(song: Song?): String? =
+fun rememberRemoteArtworkUrl(song: Song?): String? =
     PlayerPlatform.host.rememberRemoteArtworkUrl(song)
 
 @Composable

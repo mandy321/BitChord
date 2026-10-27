@@ -1678,19 +1678,34 @@ private fun LosslessOrStats(
             iconPainter = painterResource(Res.drawable.ic_dolby_atmos),
             modifier = modifier,
         )
-        // Lossy, but the good end of lossy — a module's 320kbps tier, which
-        // for a great many tracks is the best copy that exists anywhere the
-        // app can reach. See [NerdStats.Snapshot.isHiQuality].
-        nerdStats?.isHiQuality == true -> LosslessLabel(
-            text = stringResource(Res.string.high_quality),
-            animated = false,
-            iconPainter = rememberVectorPainter(Icons.Rounded.Headphones),
-            // A Material glyph's own size is 24dp; the badge's are drawn small.
-            iconSize = 13.dp,
-            modifier = modifier,
-        )
-        // Below that, no badge: "Medium Quality" and "Data Saver" are gone.
-        // The space under the bar is kept for what is worth announcing.
+        nerdStats != null -> {
+            val codec = when (val mime = nerdStats.mimeType?.lowercase()) {
+                null -> null
+                "audio/flac" -> "FLAC"
+                "audio/alac" -> "ALAC"
+                "audio/mp4a-latm", "audio/aac" -> "AAC"
+                "audio/opus" -> "Opus"
+                "audio/vorbis" -> "Vorbis"
+                "audio/mpeg" -> "MP3"
+                else -> mime.substringAfter('/').uppercase()
+            }
+            val kbps = nerdStats.bitrateKbps
+            val text = when {
+                codec != null && kbps != null && kbps > 0 -> "$codec • $kbps kbps"
+                codec != null -> codec
+                nerdStats.isHiQuality -> stringResource(Res.string.high_quality)
+                else -> null
+            }
+            if (text != null) {
+                LosslessLabel(
+                    text = text,
+                    animated = false,
+                    iconPainter = rememberVectorPainter(Icons.Rounded.Headphones),
+                    iconSize = 13.dp,
+                    modifier = modifier,
+                )
+            }
+        }
         else -> {}
     }
 }

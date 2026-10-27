@@ -190,9 +190,8 @@ object SourceRegistry {
                 when {
                     config.kind == SourceKind.YOUTUBE && !config.enabled -> config.copy(enabled = true)
                     config.kind == SourceKind.JIOSAAVN && forceJioSaavnOff -> config.copy(enabled = false)
-                    config.id == "app.bitchord.lastbabe" ||
-                    config.id == "eljohnzc.addon.mono" ||
                     config.id == "dev.akira.bitchord-hires" ||
+                    config.id == "eljohnzc.addon.mono" ||
                     config.id == "eljohnzc.addon.music" -> config.copy(enabled = true)
                     else -> config
                 }
@@ -545,10 +544,10 @@ object SourceRegistry {
 
     val PREBAKED_SOURCES = listOf(
         SourceConfig(
-            id = "app.bitchord.lastbabe",
+            id = "dev.akira.bitchord-hires",
             kind = SourceKind.ADDON,
-            label = "Last Babe 💕 (Lossless FLAC)",
-            baseUrl = "https://lastbabe.velixir.run/e/1793086716/56ab9b9f20a6a8f7cd1cddd6cad00572/manifest.json",
+            label = "BitChord Hi-Res (Hi-Res & Lossless)",
+            baseUrl = "https://bitchord-hires-addon.vercel.app/manifest.json",
             enabled = true,
             allowDownloads = true,
             checkValidLossless = false,
@@ -563,20 +562,20 @@ object SourceRegistry {
             checkValidLossless = false,
         ),
         SourceConfig(
-            id = "dev.akira.bitchord-hires",
-            kind = SourceKind.ADDON,
-            label = "BitChord Hi-Res (Hi-Res & Lossless)",
-            baseUrl = "https://bitchord-hires-addon.vercel.app/manifest.json",
-            enabled = true,
-            allowDownloads = true,
-            checkValidLossless = false,
-        ),
-        SourceConfig(
             id = "eljohnzc.addon.music",
             kind = SourceKind.ADDON,
             label = "Eljohnzc Addon (Hi-Res & Lossless, High, Low)",
             baseUrl = "https://eljohnzc-addon.de.deplexo.com/c57e7b0ef2031b2f1fcd/manifest.json",
             enabled = true,
+            allowDownloads = true,
+            checkValidLossless = false,
+        ),
+        SourceConfig(
+            id = "app.bitchord.lastbabe",
+            kind = SourceKind.ADDON,
+            label = "Last Babe 💕 (Lossless FLAC)",
+            baseUrl = "https://lastbabe.velixir.run/e/1793086716/56ab9b9f20a6a8f7cd1cddd6cad00572/manifest.json",
+            enabled = false,
             allowDownloads = true,
             checkValidLossless = false,
         ),

@@ -94,6 +94,7 @@ fun TvSettingsScreen(
     val refreshRate by TvRefreshRateController.preference.collectAsState()
     val reduceMotion by AppSettings.reduceAnimation.collectAsState()
     val reduceTransparency by AppSettings.reduceDynamicBlur.collectAsState()
+    val hideYoutubeThumbnails by TvSettings.tvHideYoutubeThumbnails.collectAsState()
 
     var blurb by remember { mutableStateOf(DefaultBlurb) }
     var sheet by remember { mutableStateOf<SettingsSheet?>(null) }
@@ -296,6 +297,14 @@ fun TvSettingsScreen(
                         onClick = { TvSettings.setTvLyricsCanvasEnabled(!lyricsCanvas) },
                     )
                 }
+            }
+            item {
+                TvListRow(
+                    title = "Hide YouTube Thumbnails",
+                    value = onOff(hideYoutubeThumbnails),
+                    onFocused = { blurb = "Prioritizes official Apple Artwork and Spotify Canvas; suppresses low-resolution YouTube thumbnails." },
+                    onClick = { TvSettings.setTvHideYoutubeThumbnails(!hideYoutubeThumbnails) },
+                )
             }
             item {
                 TvListRow(

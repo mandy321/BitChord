@@ -315,6 +315,21 @@ private fun isGoogleImageHost(url: String): Boolean {
         host == "googleusercontent.com" || host.endsWith(".googleusercontent.com")
 }
 
+/** Whether the given URL points to a YouTube/Google CDN thumbnail image. */
+fun isYouTubeThumbnailUrl(url: String?): Boolean {
+    if (url.isNullOrBlank()) return false
+    val host = url.substringAfter("://", "")
+        .ifEmpty { url.substringAfter("//", "") }
+        .substringBefore('/')
+        .substringBefore(':')
+        .substringBefore('?')
+        .lowercase()
+    return isGoogleImageHost(url) ||
+        host == "ytimg.com" || host.endsWith(".ytimg.com") ||
+        host == "youtube.com" || host.endsWith(".youtube.com") ||
+        host.contains("ytimg") || host.contains("googleusercontent")
+}
+
 private val SIZE_HINT = Regex("""w\d+-h\d+""")
 private val PARAM_SIZE_HINT = Regex("""=s\d+""")
 

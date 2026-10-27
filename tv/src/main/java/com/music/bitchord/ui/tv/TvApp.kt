@@ -1,5 +1,8 @@
 package com.music.bitchord.ui.tv
 
+import com.music.bitchord.data.canvas.AppleArtworkRepository
+import com.music.bitchord.data.model.isYouTubeThumbnailUrl
+
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -195,10 +198,17 @@ fun TvApp(
     }
 
 
+    val hideYoutubeThumbnails by TvSettings.tvHideYoutubeThumbnails.collectAsState()
+    val activeSong = playerState.song
+    val activeCanvasArt = activeSong?.let { song ->
+        AppleArtworkRepository.cached(song)?.artworkUrl
+            ?: if (!hideYoutubeThumbnails || !isYouTubeThumbnailUrl(song.thumbnailUrl)) song.thumbnailUrl else null
+    }
+
     Box(
         modifier = modifier
             .fillMaxSize()
-            .tvCanvas(playerState.song?.thumbnailUrl),
+            .tvCanvas(activeCanvasArt),
     ) {
         AnimatedContent(
             targetState = isRunningSetup,

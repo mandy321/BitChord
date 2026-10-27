@@ -80,8 +80,11 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.util.lerp
 import androidx.media3.common.Player
 import com.music.bitchord.data.NerdStats
+import com.music.bitchord.data.canvas.AppleArtworkRepository
 import com.music.bitchord.data.canvas.CanvasArtwork
 import com.music.bitchord.data.canvas.CanvasRepository
+import com.music.bitchord.data.model.isYouTubeThumbnailUrl
+import com.music.bitchord.data.settings.TvSettings
 import com.music.bitchord.data.lyrics.LyricLine
 import com.music.bitchord.data.model.Song
 import com.music.bitchord.data.settings.AppSettings
@@ -165,9 +168,31 @@ internal fun TvNowPlayingStage(
     // While the transport is up the lyrics fade out above it rather than run under it.
     val underControls by animateFloatAsState(if (controlsVisible) 1f else 0f, tween(320), label = "lyricsFade")
     val canvasEnabled by AppSettings.animatedCanvas.collectAsState()
+    val prioritizeSpotifyCanvas by AppSettings.prioritizeSpotifyCanvas.collectAsState()
+    val hideYoutubeThumbnails by TvSettings.tvHideYoutubeThumbnails.collectAsState()
+
+    var appleArt by remember(song.videoId) { mutableStateOf(AppleArtworkRepository.cached(song)) }
     var canvas by remember(song.videoId) { mutableStateOf<CanvasArtwork?>(null) }
-    LaunchedEffect(song.videoId, canvasEnabled) {
-        canvas = if (canvasEnabled) CanvasRepository.canvasFor(song) else null
+
+    LaunchedEffect(song.videoId, canvasEnabled, prioritizeSpotifyCanvas) {
+        val art = AppleArtworkRepository.artworkFor(song)
+        appleArt = art
+
+        if (!canvasEnabled) {
+            canvas = null
+            return@LaunchedEffect
+        }
+
+        // Priority order:
+        // 1. Apple Artwork (Apple Music motion artwork first)
+        // 2. Spotify Canvas (if Apple motion artwork not available, or prioritizeSpotifyCanvas is true)
+        if (prioritizeSpotifyCanvas) {
+            canvas = CanvasRepository.canvasFor(song) ?: art?.motionCanvas
+        } else if (art?.motionCanvas != null) {
+            canvas = art.motionCanvas
+        } else {
+            canvas = CanvasRepository.canvasFor(song)
+        }
     }
     val side by animateFloatAsState(if (showLyrics) 1f else 0f, tween(520), label = "artToSide")
 
@@ -197,7 +222,12 @@ internal fun TvNowPlayingStage(
                     clip = true
                 },
         ) {
-            TvArtwork(url = song.thumbnailUrl, px = 720, shape = RectangleShape, modifier = Modifier.fillMaxSize())
+            val coverUrl = when {
+                !appleArt?.artworkUrl.isNullOrBlank() -> appleArt?.artworkUrl
+                !hideYoutubeThumbnails || !isYouTubeThumbnailUrl(song.thumbnailUrl) -> song.thumbnailUrl
+                else -> null
+            }
+            TvArtwork(url = coverUrl, px = 720, shape = RectangleShape, modifier = Modifier.fillMaxSize())
             canvas?.let { CanvasArtworkPlayer(canvas = it, isPlaying = isPlaying, modifier = Modifier.fillMaxSize()) }
         }
 
@@ -798,6 +828,7 @@ internal fun TvUpNext(
             )
         } else {
             val indexed = remember(upcoming) { upcoming.withIndex().toList() }
+            val hideYoutubeThumbnails by TvSettings.tvHideYoutubeThumbnails.collectAsState()
             TvRow(
                 items = indexed,
                 key = { "${it.value.videoId}#${it.index}" },
@@ -807,10 +838,12 @@ internal fun TvUpNext(
                 top = 13.dp,
                 bottom = 5.dp,
             ) { i, entry ->
+                val cardArtUrl = AppleArtworkRepository.cached(entry.value)?.artworkUrl
+                    ?: if (!hideYoutubeThumbnails || !isYouTubeThumbnailUrl(entry.value.thumbnailUrl)) entry.value.thumbnailUrl else null
                 TvLockup(
                     title = entry.value.title,
                     subtitle = entry.value.artist,
-                    artworkUrl = entry.value.thumbnailUrl,
+                    artworkUrl = cardArtUrl,
                     width = 99.dp,
                     onClick = { onJump(currentIndex + 1 + i) },
                     modifier = if (i == 0) Modifier.focusRequester(firstCardFocus) else Modifier,

@@ -36,7 +36,10 @@ import androidx.media3.common.Player
 import androidx.media3.session.MediaController
 import com.music.bitchord.data.LikeState
 import com.music.bitchord.data.model.LikeStatus
+import com.music.bitchord.data.canvas.AppleArtworkRepository
+import com.music.bitchord.data.model.isYouTubeThumbnailUrl
 import com.music.bitchord.data.settings.AppSettings
+import com.music.bitchord.data.settings.TvSettings
 import com.music.bitchord.playback.PlayerState
 import com.music.bitchord.playback.toggleAutoplay
 import com.music.bitchord.playback.toggleShuffle
@@ -220,7 +223,17 @@ fun TvNowPlayingScreen(
                 }
             },
     ) {
-        TvPlayerBackground(artworkUrl = song.thumbnailUrl)
+        val hideYoutubeThumbnails by TvSettings.tvHideYoutubeThumbnails.collectAsState()
+        var appleArt by remember(song.videoId) { mutableStateOf(AppleArtworkRepository.cached(song)) }
+        LaunchedEffect(song.videoId) {
+            appleArt = AppleArtworkRepository.artworkFor(song)
+        }
+        val effectiveArtworkUrl = when {
+            !appleArt?.artworkUrl.isNullOrBlank() -> appleArt?.artworkUrl
+            !hideYoutubeThumbnails || !isYouTubeThumbnailUrl(song.thumbnailUrl) -> song.thumbnailUrl
+            else -> null
+        }
+        TvPlayerBackground(artworkUrl = effectiveArtworkUrl)
 
         // The stage: takes the remote while the transport is down. Select or a
         // vertical press brings the transport up; left and right change track.

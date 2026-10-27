@@ -125,6 +125,14 @@ object AppleArtworkRepository {
         }.trim()
         if (artistTitleTerm.isNotBlank()) termsToTry.add(artistTitleTerm)
 
+        // Try censored profanity variant in search queries (e.g. "Lauv f*ck, i'm lonely")
+        // because iTunes explicit indexing stores explicit tracks under censored spelling
+        val censoredFull = fullTerm.censoredProfanityVariant()
+        if (censoredFull != null && censoredFull.isNotBlank()) termsToTry.add(censoredFull)
+
+        val censoredArtistTitle = artistTitleTerm.censoredProfanityVariant()
+        if (censoredArtistTitle != null && censoredArtistTitle.isNotBlank()) termsToTry.add(censoredArtistTitle)
+
         // If artist contains multiple collaborators or producer tags (e.g. "DILJIT DOSANJH & thiarajxtt"),
         // try the primary artist as well so iTunes finds the official studio release
         if (!primary.equals(artist, ignoreCase = true)) {
@@ -142,10 +150,16 @@ object AppleArtworkRepository {
                 append(title)
             }.trim()
             if (primaryTitle.isNotBlank()) termsToTry.add(primaryTitle)
+
+            val primaryCensored = primaryTitle.censoredProfanityVariant()
+            if (primaryCensored != null && primaryCensored.isNotBlank()) termsToTry.add(primaryCensored)
         }
 
         // Try title alone as fallback for unique track names
-        if (title.isNotBlank()) termsToTry.add(title.trim())
+        if (title.isNotBlank()) {
+            termsToTry.add(title.trim())
+            title.censoredProfanityVariant()?.let { if (it.isNotBlank()) termsToTry.add(it) }
+        }
 
         for (term in termsToTry) {
             val itunesHit = queryItunes(term, title, artist, album, bestMotion)
@@ -183,18 +197,22 @@ object AppleArtworkRepository {
         val root = runCatching { JSONObject(body) }.getOrNull()
         val results = root?.optJSONArray("results") ?: return null
 
-        val wantedTitle = title.normalizeForMatch()
+        val wantedTitle = title.foldProfanity().normalizeForMatch()
         val wantedArtists = splitArtists(artist)
         val wantedAlbum = album?.normalizeForMatch()
 
         for (i in 0 until results.length()) {
             val r = results.optJSONObject(i) ?: continue
-            val trackName = r.optString("trackName").normalizeForMatch()
+            val rawTrackName = r.optString("trackName")
+            val trackName = rawTrackName.foldProfanity().normalizeForMatch()
             val collectionName = r.optString("collectionName").normalizeForMatch()
 
             // Match validation
+            val cTrackName = rawTrackName.cleanedTrackTitle().foldProfanity().normalizeForMatch()
             val titleOk = trackName.contains(wantedTitle) || wantedTitle.contains(trackName) ||
-                trackName.replace(" ", "") == wantedTitle.replace(" ", "")
+                trackName.replace(" ", "") == wantedTitle.replace(" ", "") ||
+                cTrackName == wantedTitle ||
+                (wantedTitle.isNotBlank() && cTrackName.contains(wantedTitle))
             val artistOk = wantedArtists.isEmpty() || wantedArtists.any { want ->
                 splitArtists(r.optString("artistName")).any { credited ->
                     credited.contains(want) || want.contains(credited)
@@ -225,14 +243,46 @@ object AppleArtworkRepository {
     }
 }
 
+private val PROFANITY_MAP = listOf(
+    Regex("(?i)\\bfuck\\b") to "f*ck",
+    Regex("(?i)\\bshit\\b") to "sh*t",
+    Regex("(?i)\\bbitch\\b") to "b*tch",
+)
+
+private fun String.censoredProfanityVariant(): String? {
+    var changed = false
+    var res = this
+    for ((regex, rep) in PROFANITY_MAP) {
+        if (regex.containsMatchIn(res)) {
+            res = res.replace(regex, rep)
+            changed = true
+        }
+    }
+    return if (changed) res else null
+}
+
+private val PROFANITY_FOLD = Regex("""\bf\s*[*k]+\s*ck\b|\bf\s*[*]+\s*k\b""", RegexOption.IGNORE_CASE)
+private val SHIT_FOLD = Regex("""\bsh\s*[*]+\s*t\b""", RegexOption.IGNORE_CASE)
+private val BITCH_FOLD = Regex("""\bb\s*[*]+\s*tch\b""", RegexOption.IGNORE_CASE)
+
+fun String.foldProfanity(): String = this
+    .replace(PROFANITY_FOLD, "fuck")
+    .replace(SHIT_FOLD, "shit")
+    .replace(BITCH_FOLD, "bitch")
+
 private val TRACK_NOISE = Regex(
-    """\((?:from|official|lyrical|video|audio)[^)]*\)|\[[^]]*]|""" +
-        """\b(?:official (?:video|audio|music video)|lyrical|full song|4k video)\b""",
+    """\s*[\(\[]\s*(?:from|feat\.?|ft\.?|featuring|with|stripped|acoustic|remix|live|radio edit|official|video|audio|version|deluxe|bonus|edit|prod\.?|produced by|lyrical|visualizer|mv|hd|4k|hq|full song)[^\)\]]*[\)\]]|""" +
+        """\s*\b(?:official\s+(?:music\s+)?(?:video|audio)|lyrical(?:\s+video)?|full\s+song|4k\s+video|hd\s+video|music\s+video)\b""",
     RegexOption.IGNORE_CASE,
 )
 
-fun String.cleanedTrackTitle(): String = replace(TRACK_NOISE, " ")
+fun String.cleanedTrackTitle(): String = this
+    .replace('’', '\'')
+    .replace('‘', '\'')
+    .replace(TRACK_NOISE, " ")
     .substringBefore(" | ")
+    .replace(Regex("\\[[^\\]]*\\]"), " ")
     .replace(Regex("\\s+"), " ")
     .trim()
     .ifBlank { this }
+

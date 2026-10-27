@@ -94,14 +94,22 @@ object AppleArtworkRepository {
         if (song.videoId.isNotBlank()) "song|${song.videoId}" else "song|${song.title}|${song.artist}"
 
     private suspend fun resolve(title: String, artist: String, album: String?): AppleArtwork? {
+        val primary = primaryArtist(artist).ifBlank { artist }
+
         // 1. Priority 1 for Motion: Apple Music motion artwork
-        val appleMotion = runCatching { AppleMusicCanvas.search(title, artist, album) }.getOrNull()
+        val appleMotion = runCatching {
+            AppleMusicCanvas.search(title, artist, album)
+                ?: if (!primary.equals(artist, ignoreCase = true)) AppleMusicCanvas.search(title, primary, album) else null
+        }.getOrNull()
 
         // 2. Priority 2 for Motion: Spotify Canvas looping video (if Apple motion not available)
-        val bestMotion = appleMotion ?: runCatching { SpotifyCanvas.search(title, artist, album) }.getOrNull()
+        val bestMotion = appleMotion ?: runCatching {
+            SpotifyCanvas.search(title, artist, album)
+                ?: if (!primary.equals(artist, ignoreCase = true)) SpotifyCanvas.search(title, primary, album) else null
+        }.getOrNull()
 
         // 3. Fetch official Apple Music studio album art from iTunes Search API with progressive queries
-        val termsToTry = mutableListOf<String>()
+        val termsToTry = linkedSetOf<String>()
         val fullTerm = buildString {
             if (!title.contains(artist, ignoreCase = true)) append(artist).append(' ')
             append(title)
@@ -109,15 +117,35 @@ object AppleArtworkRepository {
                 append(' ').append(album)
             }
         }.trim()
-        termsToTry.add(fullTerm)
+        if (fullTerm.isNotBlank()) termsToTry.add(fullTerm)
 
         val artistTitleTerm = buildString {
             if (!title.contains(artist, ignoreCase = true)) append(artist).append(' ')
             append(title)
         }.trim()
-        if (artistTitleTerm != fullTerm && artistTitleTerm.isNotBlank()) {
-            termsToTry.add(artistTitleTerm)
+        if (artistTitleTerm.isNotBlank()) termsToTry.add(artistTitleTerm)
+
+        // If artist contains multiple collaborators or producer tags (e.g. "DILJIT DOSANJH & thiarajxtt"),
+        // try the primary artist as well so iTunes finds the official studio release
+        if (!primary.equals(artist, ignoreCase = true)) {
+            val primaryFull = buildString {
+                if (!title.contains(primary, ignoreCase = true)) append(primary).append(' ')
+                append(title)
+                if (!album.isNullOrBlank() && !title.contains(album, ignoreCase = true)) {
+                    append(' ').append(album)
+                }
+            }.trim()
+            if (primaryFull.isNotBlank()) termsToTry.add(primaryFull)
+
+            val primaryTitle = buildString {
+                if (!title.contains(primary, ignoreCase = true)) append(primary).append(' ')
+                append(title)
+            }.trim()
+            if (primaryTitle.isNotBlank()) termsToTry.add(primaryTitle)
         }
+
+        // Try title alone as fallback for unique track names
+        if (title.isNotBlank()) termsToTry.add(title.trim())
 
         for (term in termsToTry) {
             val itunesHit = queryItunes(term, title, artist, album, bestMotion)

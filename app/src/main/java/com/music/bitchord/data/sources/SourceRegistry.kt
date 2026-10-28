@@ -190,9 +190,7 @@ object SourceRegistry {
                 when {
                     config.kind == SourceKind.YOUTUBE && !config.enabled -> config.copy(enabled = true)
                     config.kind == SourceKind.JIOSAAVN && forceJioSaavnOff -> config.copy(enabled = false)
-                    config.id == "dev.akira.bitchord-hires" ||
-                    config.id == "eljohnzc.addon.mono" ||
-                    config.id == "eljohnzc.addon.music" -> config.copy(enabled = true)
+                    PREBAKED_SOURCES.any { it.id == config.id } -> config.copy(enabled = true)
                     else -> config
                 }
             }
@@ -575,7 +573,7 @@ object SourceRegistry {
             kind = SourceKind.ADDON,
             label = "Last Babe 💕 (Lossless FLAC)",
             baseUrl = "https://lastbabe.velixir.run/e/1793086716/56ab9b9f20a6a8f7cd1cddd6cad00572/manifest.json",
-            enabled = false,
+            enabled = true,
             allowDownloads = true,
             checkValidLossless = false,
         ),
@@ -584,7 +582,7 @@ object SourceRegistry {
             kind = SourceKind.ADDON,
             label = "BluBit Station Hi-Fi",
             baseUrl = "https://bluebit.jucepe0929.workers.dev/manifest.json",
-            enabled = false,
+            enabled = true,
             allowDownloads = true,
             checkValidLossless = false,
         ),
@@ -593,7 +591,7 @@ object SourceRegistry {
             kind = SourceKind.ADDON,
             label = "GGLOS (Lossless & Atmos)",
             baseUrl = "https://gglos.geisselgottes.cfd/manifest.json",
-            enabled = false,
+            enabled = true,
             allowDownloads = true,
             checkValidLossless = false,
         ),
@@ -602,7 +600,7 @@ object SourceRegistry {
             kind = SourceKind.ADDON,
             label = "Lossless Bridge",
             baseUrl = "https://losslessbridge.de.deplexo.com/manifest.json",
-            enabled = false,
+            enabled = true,
             allowDownloads = true,
             checkValidLossless = false,
         ),
@@ -611,7 +609,7 @@ object SourceRegistry {
             kind = SourceKind.ADDON,
             label = "Qobuz",
             baseUrl = "https://qobuz-addon.vercel.app/manifest.json",
-            enabled = false,
+            enabled = true,
             allowDownloads = true,
             checkValidLossless = false,
         ),
@@ -620,7 +618,7 @@ object SourceRegistry {
             kind = SourceKind.ADDON,
             label = "Deezer ARL",
             baseUrl = "https://deezer.nom.deno.net/u/2cdc77d5a051ca15",
-            enabled = false,
+            enabled = true,
             allowDownloads = true,
             checkValidLossless = false,
         ),
@@ -629,7 +627,7 @@ object SourceRegistry {
             kind = SourceKind.ADDON,
             label = "Deezer",
             baseUrl = "https://deezer.nom.deno.net/manifest.json",
-            enabled = false,
+            enabled = true,
             allowDownloads = true,
             checkValidLossless = false,
         ),
@@ -638,7 +636,7 @@ object SourceRegistry {
             kind = SourceKind.ADDON,
             label = "GGLOS (Backup)",
             baseUrl = "https://gglos.ggottes.deno.net/manifest.json",
-            enabled = false,
+            enabled = true,
             allowDownloads = true,
             checkValidLossless = false,
         ),
@@ -647,7 +645,7 @@ object SourceRegistry {
             kind = SourceKind.ADDON,
             label = "GGLOS S1",
             baseUrl = "https://gglos.ggottes.deno.net/s1/manifest.json",
-            enabled = false,
+            enabled = true,
             allowDownloads = true,
             checkValidLossless = false,
         ),
@@ -656,7 +654,7 @@ object SourceRegistry {
             kind = SourceKind.ADDON,
             label = "GGLOS S2",
             baseUrl = "https://gglos.ggottes.deno.net/s2/manifest.json",
-            enabled = false,
+            enabled = true,
             allowDownloads = true,
             checkValidLossless = false,
         ),

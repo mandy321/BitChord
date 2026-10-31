@@ -106,6 +106,7 @@ fun TvNowPlayingScreen(
     val isLiked = likeOverrides[song.videoId] == LikeStatus.LIKE
     val shuffle by com.music.bitchord.playback.QueueShuffle.enabled.collectAsState()
     val autoplay by AppSettings.autoplay.collectAsState()
+    val playerStyle by TvSettings.tvPlayerStyle.collectAsState()
 
     LaunchedEffect(song.videoId, durationMs) {
         viewModel.loadLyrics(
@@ -233,7 +234,7 @@ fun TvNowPlayingScreen(
             !hideYoutubeThumbnails || !isYouTubeThumbnailUrl(song.thumbnailUrl) -> song.thumbnailUrl
             else -> null
         }
-        TvPlayerBackground(artworkUrl = effectiveArtworkUrl)
+        TvPlayerBackground(artworkUrl = effectiveArtworkUrl, style = playerStyle)
 
         // The stage: takes the remote while the transport is down. Select or a
         // vertical press brings the transport up; left and right change track.

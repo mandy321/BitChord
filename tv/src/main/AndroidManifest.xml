@@ -34,21 +34,6 @@
     -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
-    <!-- Reading local audio files across the device -->
-    <uses-permission android:name="android.permission.READ_MEDIA_AUDIO" />
-    <uses-permission
-        android:name="android.permission.READ_EXTERNAL_STORAGE"
-        android:maxSdkVersion="32" />
-
-    <!--
-      Only for API 28 and below. From 29 the app writes to the shared Music
-      folder through MediaStore, which grants access to the rows it created and
-      needs no permission at all — and this one stops being grantable there.
-    -->
-    <uses-permission
-        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="28" />
-
     <!-- Universal device support: TV Leanback and hardware features are optional -->
     <uses-feature
         android:name="android.software.leanback"
@@ -98,7 +83,16 @@
             android:name="com.samsung.android.support.ongoing_activity"
             android:value="true" />
 
-        <!-- TV-only hooks into shared code, in place before any component starts. -->
+        <!-- The tap on a "new songs in this playlist" notification. See PlaylistSync. -->
+        <receiver
+            android:name="com.music.bitchord.download.PlaylistSyncApproval"
+            android:exported="false" />
+
+        <!--
+          TV-only hooks into shared code, in place before any component starts.
+          WorkManager comes up on first use instead of at every launch, since the
+          one thing using it is a setting that is off by default.
+        -->
         <provider
             android:name="androidx.startup.InitializationProvider"
             android:authorities="${applicationId}.androidx-startup"
@@ -107,6 +101,10 @@
             <meta-data
                 android:name="com.music.bitchord.data.TvStartup"
                 android:value="androidx.startup" />
+            <meta-data
+                android:name="androidx.work.WorkManagerInitializer"
+                android:value="androidx.startup"
+                tools:node="remove" />
         </provider>
         <service
             android:name="androidx.appcompat.app.AppLocalesMetadataHolderService"

@@ -8,6 +8,15 @@ import javax.crypto.SecretKeyFactory
 import javax.crypto.spec.PBEKeySpec
 import kotlinx.coroutines.flow.MutableStateFlow
 
+/** What Now Playing draws behind the song. */
+enum class TvPlayerStyle(val label: String) {
+    /** The moving mesh of the artwork's colours. */
+    DEFAULT("Default"),
+
+    /** Pure black, so an OLED panel's pixels stay off around the cover and lyrics. */
+    AMOLED("AMOLED"),
+}
+
 /**
  * The Android TV app's own preferences. They live in the same preferences file
  * as [AppSettings] — `bitchord_settings` — under `tv_`-prefixed keys, so the
@@ -32,6 +41,7 @@ object TvSettings {
     val tvVideoAuto1080p = MutableStateFlow(true)
     val tvNavLayout = MutableStateFlow("left_rail")
     val tvHideYoutubeThumbnails = MutableStateFlow(true)
+    val tvPlayerStyle = MutableStateFlow(TvPlayerStyle.DEFAULT)
 
     /** UI density/scale multiplier for the TV layout: 0.8 (Small) → 1.0 (Normal) → 1.2 (Large) → 1.4 (XL). */
     val tvUiScale = MutableStateFlow(1.0f)
@@ -55,6 +65,9 @@ object TvSettings {
         tvVideoAuto1080p.value = prefs.getBoolean(KEY_TV_VIDEO_AUTO_1080P, true)
         tvNavLayout.value = prefs.getString(KEY_TV_NAV_LAYOUT, "left_rail") ?: "left_rail"
         tvHideYoutubeThumbnails.value = prefs.getBoolean(KEY_TV_HIDE_YOUTUBE_THUMBNAILS, true)
+        tvPlayerStyle.value = runCatching {
+            TvPlayerStyle.valueOf(prefs.getString(KEY_TV_PLAYER_STYLE, null) ?: TvPlayerStyle.DEFAULT.name)
+        }.getOrDefault(TvPlayerStyle.DEFAULT)
     }
 
     fun init(context: Context) {
@@ -151,6 +164,11 @@ object TvSettings {
     fun setTvNavLayout(layout: String) {
         tvNavLayout.value = layout
         save { putString(KEY_TV_NAV_LAYOUT, layout) }
+    }
+
+    fun setTvPlayerStyle(style: TvPlayerStyle) {
+        tvPlayerStyle.value = style
+        save { putString(KEY_TV_PLAYER_STYLE, style.name) }
     }
 
     /**
@@ -290,4 +308,5 @@ object TvSettings {
     private const val KEY_TV_VIDEO_AUTO_1080P = "tv_video_auto_1080p"
     private const val KEY_TV_NAV_LAYOUT = "tv_nav_layout"
     private const val KEY_TV_HIDE_YOUTUBE_THUMBNAILS = "tv_hide_youtube_thumbnails"
+    private const val KEY_TV_PLAYER_STYLE = "tv_player_style"
 }

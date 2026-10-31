@@ -159,23 +159,30 @@ object SourceRegistry {
         // Seeded rather than persisted-on-first-write, so a build adding a new
         // built-in kind picks it up for existing installs too. SourceConfig's
         // default is the policy: JioSaavn off, YouTube on.
+        fun String.normalizeUrl(): String = this.trim().trimEnd('/').removeSuffix("/manifest.json")
+
         val updatedStored = stored.map { s ->
-            val match = PREBAKED_SOURCES.firstOrNull { it.id == s.id }
-                ?: if (s.baseUrl.contains("eljohnzcaddon.velixir.run") || s.baseUrl.contains("eljohnzc-addon")) {
-                    PREBAKED_SOURCES.firstOrNull { it.id == "eljohnzc.addon.music" }
+            val sNorm = s.baseUrl.normalizeUrl()
+            val match = PREBAKED_SOURCES.firstOrNull { it.id == s.id || it.baseUrl.normalizeUrl() == sNorm }
+                ?: if (s.baseUrl.contains("qobuz") && (s.baseUrl.contains("vercel") || s.baseUrl.contains("soundfean"))) {
+                    PREBAKED_SOURCES.firstOrNull { it.id == "dev.bitperfect.qobuz.heisenbergg" }
                 } else if (s.baseUrl.contains("bitchord-hires")) {
                     PREBAKED_SOURCES.firstOrNull { it.id == "dev.akira.bitchord-hires" }
-                } else if (s.baseUrl.contains("eljohnzc-mono")) {
+                } else if (s.baseUrl.contains("eljohnzc-mono") || s.baseUrl.contains("eljohnzc")) {
                     PREBAKED_SOURCES.firstOrNull { it.id == "eljohnzc.addon.mono" }
                 } else null
 
             if (match != null && (match.baseUrl != s.baseUrl || match.label != s.label)) {
-                s.copy(baseUrl = match.baseUrl, label = match.label)
+                s.copy(id = match.id, baseUrl = match.baseUrl, label = match.label)
             } else {
                 s
             }
         }
-        val withPrebaked = PREBAKED_SOURCES.filter { pre -> updatedStored.none { it.id == pre.id || it.baseUrl == pre.baseUrl } } + updatedStored
+        val distinctStored = updatedStored.distinctBy { it.baseUrl.normalizeUrl().ifBlank { it.id } }
+        val withPrebaked = PREBAKED_SOURCES.filter { pre ->
+            val preNorm = pre.baseUrl.normalizeUrl()
+            distinctStored.none { it.id == pre.id || it.baseUrl.normalizeUrl() == preNorm }
+        } + distinctStored
         val prebakedOrder = PREBAKED_SOURCES.map { it.id }.withIndex().associate { it.value to it.index }
         val prioritized = withPrebaked.sortedBy { prebakedOrder[it.id] ?: (100 + it.kind.ordinal) }
         val seeded = prioritized + BUILT_IN_KINDS
@@ -238,6 +245,35 @@ object SourceRegistry {
     fun activeForDownload(): List<MusicSource> =
         active().filter { config(it.configId)?.allowDownloads != false }
 
+    /** Why an enabled addon has no part in downloads right now — see [addonsLeftOutOfDownloads]. */
+    enum class DownloadExclusion {
+        /** Its manifest says `allowDownloads: 0`. */
+        DOWNLOADS_NOT_ALLOWED,
+
+        /** It asks for a lossless output (`checkValidLossless`) and none is connected. */
+        NEEDS_LOSSLESS_OUTPUT,
+    }
+
+    /**
+     * The enabled addons [activeForDownload] leaves out, and why.
+     *
+     * Both are the addon's own rules, and both used to be applied in silence: a
+     * listener with an addon connected watched downloads arrive from JioSaavn
+     * or YouTube with nothing to say the addon had been passed over on purpose.
+     * The second is the one that catches people out — the phone speaker and
+     * ordinary Bluetooth don't count as lossless outputs.
+     */
+    fun addonsLeftOutOfDownloads(): List<Pair<SourceConfig, DownloadExclusion>> =
+        enabledConfigs(configs.value)
+            .filter { it.kind == SourceKind.ADDON }
+            .mapNotNull { config ->
+                when {
+                    !config.allowDownloads -> config to DownloadExclusion.DOWNLOADS_NOT_ALLOWED
+                    config.awaitsLosslessOutput -> config to DownloadExclusion.NEEDS_LOSSLESS_OUTPUT
+                    else -> null
+                }
+            }
+
     /**
      * Records what an addon's manifest said about downloads and lossless
      * output, if it changed.
@@ -280,6 +316,22 @@ object SourceRegistry {
     fun activeForPlayback(): List<MusicSource> {
         val ceiling = AppSettings.effectiveAudioQuality
         return active().filter { ceiling.permits(it.kind) }
+    }
+
+    /**
+     * Whether a stream [configId] served may still be played under the ceiling
+     * in force — the same test as [activeForPlayback], asked of a stream that
+     * was found earlier, under whatever ceiling applied then.
+     *
+     * Null or unknown is a yes: a stream that names no source is YouTube's own,
+     * and YouTube is permitted on every rung.
+     */
+    fun permitsForPlayback(
+        configId: String?,
+        ceiling: AudioQuality = AppSettings.effectiveAudioQuality,
+    ): Boolean {
+        val kind = configId?.let { config(it)?.kind } ?: return true
+        return ceiling.permits(kind)
     }
 
     fun instance(configId: String): MusicSource? = instances[configId]
@@ -560,28 +612,19 @@ object SourceRegistry {
             checkValidLossless = false,
         ),
         SourceConfig(
-            id = "eljohnzc.addon.music",
-            kind = SourceKind.ADDON,
-            label = "Eljohnzc Addon (Hi-Res & Lossless, High, Low)",
-            baseUrl = "https://eljohnzc-addon.de.deplexo.com/c57e7b0ef2031b2f1fcd/manifest.json",
-            enabled = true,
-            allowDownloads = true,
-            checkValidLossless = false,
-        ),
-        SourceConfig(
-            id = "app.bitchord.lastbabe",
-            kind = SourceKind.ADDON,
-            label = "Last Babe 💕 (Lossless FLAC)",
-            baseUrl = "https://lastbabe.velixir.run/e/1793086716/56ab9b9f20a6a8f7cd1cddd6cad00572/manifest.json",
-            enabled = true,
-            allowDownloads = true,
-            checkValidLossless = false,
-        ),
-        SourceConfig(
             id = "com.8spine.tidal-deezer",
             kind = SourceKind.ADDON,
             label = "BluBit Station Hi-Fi",
             baseUrl = "https://bluebit.jucepe0929.workers.dev/manifest.json",
+            enabled = true,
+            allowDownloads = true,
+            checkValidLossless = false,
+        ),
+        SourceConfig(
+            id = "dev.bitperfect.qobuz.heisenbergg",
+            kind = SourceKind.ADDON,
+            label = "Qobuz [Heisenbergg] (Hi-Res FLAC)",
+            baseUrl = "https://soundfean-musics.onrender.com/a/manifest.json",
             enabled = true,
             allowDownloads = true,
             checkValidLossless = false,
@@ -596,6 +639,15 @@ object SourceRegistry {
             checkValidLossless = false,
         ),
         SourceConfig(
+            id = "gglos.ggottes.s1",
+            kind = SourceKind.ADDON,
+            label = "GGLOS S1 (Backup)",
+            baseUrl = "https://gglos.ggottes.deno.net/s1/manifest.json",
+            enabled = false,
+            allowDownloads = true,
+            checkValidLossless = false,
+        ),
+        SourceConfig(
             id = "app.bitchord.lossless-bridge",
             kind = SourceKind.ADDON,
             label = "Lossless Bridge",
@@ -605,56 +657,20 @@ object SourceRegistry {
             checkValidLossless = false,
         ),
         SourceConfig(
-            id = "qobuz-addon",
-            kind = SourceKind.ADDON,
-            label = "Qobuz",
-            baseUrl = "https://qobuz-addon.vercel.app/manifest.json",
-            enabled = true,
-            allowDownloads = true,
-            checkValidLossless = false,
-        ),
-        SourceConfig(
-            id = "deezer.nom.user",
-            kind = SourceKind.ADDON,
-            label = "Deezer ARL",
-            baseUrl = "https://deezer.nom.deno.net/u/2cdc77d5a051ca15",
-            enabled = true,
-            allowDownloads = true,
-            checkValidLossless = false,
-        ),
-        SourceConfig(
             id = "deezer.nom",
             kind = SourceKind.ADDON,
-            label = "Deezer",
+            label = "Deezer Hi-Fi",
             baseUrl = "https://deezer.nom.deno.net/manifest.json",
             enabled = true,
             allowDownloads = true,
             checkValidLossless = false,
         ),
         SourceConfig(
-            id = "gglos.ggottes",
+            id = "botkeep.bppcaf.addon",
             kind = SourceKind.ADDON,
-            label = "GGLOS (Backup)",
-            baseUrl = "https://gglos.ggottes.deno.net/manifest.json",
-            enabled = true,
-            allowDownloads = true,
-            checkValidLossless = false,
-        ),
-        SourceConfig(
-            id = "gglos.ggottes.s1",
-            kind = SourceKind.ADDON,
-            label = "GGLOS S1",
-            baseUrl = "https://gglos.ggottes.deno.net/s1/manifest.json",
-            enabled = true,
-            allowDownloads = true,
-            checkValidLossless = false,
-        ),
-        SourceConfig(
-            id = "gglos.ggottes.s2",
-            kind = SourceKind.ADDON,
-            label = "GGLOS S2",
-            baseUrl = "https://gglos.ggottes.deno.net/s2/manifest.json",
-            enabled = true,
+            label = "BPCAF Lossless",
+            baseUrl = "https://bppcaf.bot-keep.xyz/manifest.json",
+            enabled = false,
             allowDownloads = true,
             checkValidLossless = false,
         ),

@@ -860,11 +860,6 @@ object SourceResolver {
      * length that agrees, and the cost of being wrong here is a listener's
      * song replaced mid-play by a different cut of it.
      *
-    /**
-     * Either side being unknown is a no. An unverifiable length is not a
-     * length that agrees, and the cost of being wrong here is a listener's
-     * song replaced mid-play by a different cut of it.
-     *
      * @param isVideoOrigin true when the currently-playing stream came from a
      *   music video with visual intro/outro footage.
      * @param slackSec the listener's own tolerance when it is a swap being

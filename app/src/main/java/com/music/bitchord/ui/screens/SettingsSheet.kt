@@ -570,6 +570,21 @@ fun SettingsScreen(
                         )
                     }
                 }
+                val strictLosslessTitle = "Strict Lossless / Dolby Only"
+                row(strictLosslessTitle, "audiophile", "lossless", "dolby", "opus") {
+                    SettingsRow(
+                        icon = Icons.Rounded.GraphicEq,
+                        title = strictLosslessTitle,
+                        subtitle = "Never falls back to lossy Opus. Automatically skips tracks if no Lossless or Dolby Atmos master is available.",
+                        trailing = {
+                            IosSwitch(
+                                checked = strictLosslessOnly,
+                                onCheckedChange = AppSettings::setStrictLosslessOnly,
+                            )
+                        },
+                        onClick = { AppSettings.setStrictLosslessOnly(!strictLosslessOnly) },
+                    )
+                }
             }
 
             // The categories, each a page of its own — until there is a query,
@@ -581,25 +596,6 @@ fun SettingsScreen(
                         WearOsSettingsRow(onClick = onWearOs)
                     }
                 }
-            }
-            val strictLosslessTitle = "Strict Lossless / Dolby Only"
-            row(strictLosslessTitle, "audiophile", "lossless", "dolby", "opus") {
-                SettingsRow(
-                    icon = Icons.Rounded.GraphicEq,
-                    title = strictLosslessTitle,
-                    subtitle = "Never falls back to lossy Opus. Automatically skips tracks if no Lossless or Dolby Atmos master is available.",
-                    trailing = {
-                        Switch(
-                            checked = strictLosslessOnly,
-                            onCheckedChange = AppSettings::setStrictLosslessOnly,
-                            colors = SwitchDefaults.colors(
-                                checkedTrackColor = MaterialTheme.colorScheme.primary,
-                                checkedBorderColor = MaterialTheme.colorScheme.primary,
-                            ),
-                        )
-                    },
-                    onClick = { AppSettings.setStrictLosslessOnly(!strictLosslessOnly) },
-                )
             }
         }
 

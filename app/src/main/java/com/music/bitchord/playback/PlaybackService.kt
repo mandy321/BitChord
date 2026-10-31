@@ -6937,7 +6937,6 @@ class PlaybackService : MediaLibraryService() {
             advertisedEncodings = advertisedEncodings,
             advertisedSampleRates = advertisedSampleRates,
             requestedMode = if (AppSettings.audioPassthrough.value) OutputPcmMode.FLOAT_32 else AppSettings.outputPcmMode.value,
-            directUsbProbe = directUsbProbe,
             directSupport = directSupport,
             bluetoothTelemetry = btTelemetry,
             delegateSupportsFloat = shouldEnableFloatOutput(),

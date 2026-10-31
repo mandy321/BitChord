@@ -313,7 +313,13 @@ private class CastAwareVolume(
         WearBridge.watchOutput,
         BitChordConnectManager.activeDevice,
         DacVolume.level,
-    ) { phone, receiver, casting, watch, connectDevice, dac ->
+    ) { args: Array<Any?> ->
+        val phone = args[0] as Float
+        val receiver = args[1] as Float
+        val casting = args[2] as Boolean
+        val watch = args[3] as com.music.bitchord.wear.WatchOutputState
+        val connectDevice = args[4]
+        val dac = args[5] as? Float
         when {
             connectDevice != null -> phone
             casting -> receiver

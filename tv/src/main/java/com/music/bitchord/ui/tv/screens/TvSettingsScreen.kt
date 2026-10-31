@@ -86,6 +86,7 @@ fun TvSettingsScreen(
     val passthrough by AppSettings.audioPassthrough.collectAsState()
     val syncedLyrics by AppSettings.syncedLyrics.collectAsState()
     val lyricsSources by AppSettings.lyricsSources.collectAsState()
+    val musicVideoEnabled by AppSettings.musicVideoEnabled.collectAsState()
     val canvas by AppSettings.animatedCanvas.collectAsState()
     val prioritizeSpotifyCanvas by AppSettings.prioritizeSpotifyCanvas.collectAsState()
     val strictLosslessOnly by AppSettings.strictLosslessOnly.collectAsState()
@@ -281,6 +282,14 @@ fun TvSettingsScreen(
                     value = "${lyricsSources.size} On",
                     onFocused = { blurb = "Choose which lyric databases to ask, and in what order." },
                     onClick = { sheet = SettingsSheet.LyricsSources },
+                )
+            }
+            item {
+                TvListRow(
+                    title = "Music Video Playback",
+                    value = onOff(musicVideoEnabled),
+                    onFocused = { blurb = "Stream and decode video for YouTube music videos. Turn off to save bandwidth and only play audio with cover artwork." },
+                    onClick = { AppSettings.setMusicVideoEnabled(!musicVideoEnabled) },
                 )
             }
             item {

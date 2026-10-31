@@ -251,6 +251,7 @@ fun SettingsScreen(
     val canvasOverCellular by AppSettings.canvasOverCellular.collectAsStateWithLifecycle()
     val prioritizeSpotifyCanvas by AppSettings.prioritizeSpotifyCanvas.collectAsStateWithLifecycle()
     val hideYoutubeThumbnails by AppSettings.hideYoutubeThumbnails.collectAsStateWithLifecycle()
+    val musicVideoEnabled by AppSettings.musicVideoEnabled.collectAsStateWithLifecycle()
     val strictLosslessOnly by AppSettings.strictLosslessOnly.collectAsStateWithLifecycle()
     val signatureApiEnabled by AppSettings.signatureApiEnabled.collectAsStateWithLifecycle()
     val signatureApiUrl by AppSettings.signatureApiUrl.collectAsStateWithLifecycle()
@@ -1037,6 +1038,21 @@ fun SettingsScreen(
                         )
                     },
                     onClick = { AppSettings.setLegacyMeshGradient(!legacyMeshGradient) },
+                )
+            }
+            val musicVideoPlaybackTitle = "Music Video Playback"
+            row(musicVideoPlaybackTitle, "music video", "video", "youtube", "playback") {
+                SettingsRow(
+                    icon = SfIcons.Video,
+                    title = musicVideoPlaybackTitle,
+                    subtitle = "Plays background video for music videos. Turn off to save battery and data, showing artwork and lossless audio only.",
+                    trailing = {
+                        IosSwitch(
+                            checked = musicVideoEnabled,
+                            onCheckedChange = AppSettings::setMusicVideoEnabled,
+                        )
+                    },
+                    onClick = { AppSettings.setMusicVideoEnabled(!musicVideoEnabled) },
                 )
             }
             val animatedCoverArtTitle = stringResource(R.string.animated_cover_art)

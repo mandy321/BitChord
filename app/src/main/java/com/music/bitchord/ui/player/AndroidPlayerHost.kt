@@ -107,7 +107,7 @@ class AndroidPlayerHost(context: Context) : PlayerHost {
     @Composable
     override fun CanvasVideo(spec: CanvasVideoSpec, modifier: Modifier) = AndroidCanvasVideo(spec, modifier)
 
-    override val musicVideoSupported: Boolean get() = true
+    override val musicVideoSupported: Boolean get() = AppSettings.musicVideoEnabled.value
 
     @Composable
     override fun MusicVideo(videoId: String, fit: Boolean, onRenderedChanged: (Boolean) -> Unit, modifier: Modifier) =
